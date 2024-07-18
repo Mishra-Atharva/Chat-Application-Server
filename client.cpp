@@ -37,10 +37,23 @@ public:
     }
 };
 
+auto recv_message(int client_socket) -> std::optional<std::string>
+{
+    char* message = new char[1024];
+    while (true)
+    {
+        ssize_t recv_len = recv(client_socket, message, 1024-1, 0);
+        if (recv_len < 1)
+        {
+            delete[] message;
+        }
+        std::cout << message << std::endl;
+    }
+}
+
 void messaging(int client_socket, Manager& manage)
 {
     std::string new_message;
-    std::cout << "Messaging..." << std::endl;
     std::string message;
     auto incoming = manage.recv_message(client_socket);
     if (incoming.has_value())
@@ -49,6 +62,13 @@ void messaging(int client_socket, Manager& manage)
         std::getline(std::cin >> std::ws, new_message);
     }
     manage.send_message(client_socket, new_message);
+    std::thread receving(recv_message, client_socket);
+    while (true)
+    {
+        std::getline(std::cin >> std::ws, message);
+        manage.send_message(client_socket, message);
+    }
+    receving.join();
 }
 
 int main()

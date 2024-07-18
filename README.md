@@ -4,7 +4,7 @@ This server excels in managing the entire lifecycle of user interactions: from h
 ## How to use it
 - Download the server.cpp file.
 - Make changes to the port you want the server to use or the ip you want the server to use.
-- Build the file by running this command in the terminal `g++ -std=c++20 -pthread server.cpp -o server`
+- Build the file by running this command in the terminal `make`
 - Then run the server by running this command in the terminal `./server`
 - Once the server is running open another terminal and run the command `nc (ip_address) (port_number)`
 

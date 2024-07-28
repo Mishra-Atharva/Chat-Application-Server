@@ -46,6 +46,7 @@ auto recv_message(int client_socket) -> std::optional<std::string>
         if (recv_len < 1)
         {
             delete[] message;
+            return {};
         }
         std::cout << message << std::endl;
     }

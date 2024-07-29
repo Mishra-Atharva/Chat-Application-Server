@@ -7,6 +7,7 @@
 #include <thread>
 #include <cstring>
 #include <ostream> 
+#include <optional>
 
 //Manger Class
 class Manager
@@ -15,37 +16,37 @@ private:
     std::mutex send_and_recv_mtx;
 
 public:
-    void send_message(int client, std::string message)
+    void send_message(int server, std::string message)
     {
         std::unique_lock<std::mutex> send_lock(send_and_recv_mtx);
 
-        ssize_t send_len = send(client, message.c_str(), message.length() + 1, 0);
+        ssize_t send_len = send(server, message.c_str(), message.length() + 1, 0);
 
         send_lock.unlock();
     }
 
-    void recv_message(int client) 
+    auto recv_message(int server) -> std::optional<std::string>
     {
         std::unique_lock<std::mutex> recv_lock(send_and_recv_mtx);
 
         char* message = new char[2048];
 
-        ssize_t recv_len = recv(client, message, 2048 - 1, 0);
+        ssize_t recv_len = recv(server, message, 2048 - 1, 0);
         if (recv_len < 1)
         {
             delete[] message;
+            return {};
         }
 
         recv_lock.unlock();
 
-        std::cout << message;
+        return std::string(message);
     }
 };
 
 //Setup the socket
 int setup()
 {
-
     //Setting up the socket
     int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
     
@@ -81,22 +82,57 @@ int setup()
     }
 
     //SUCCESS
-    return 0;
+    return socket_fd;
 }
 
-void start(int client, Manager& manage)
+void recv_chat(int server, Manager& manage)
+{
+    auto recv_msg = manage.recv_message(server);
+    while(true)
+    {
+        if (recv_msg.has_value())
+        {
+            std::string converted_message = recv_msg.value();
+            std::cout << converted_message;
+        }
+    }
+}
+//Starting the chat
+void start_chat(int server, Manager& manage)
 {
     std::string message;
-    manage.recv_message(client);
+    auto recv_msg = manage.recv_message(server);
+    if (recv_msg.has_value())
+    {
+        std::string converted_message = recv_msg.value();
+        std::cout << converted_message;
+    }
 
     //User enters nickname
     std::getline(std::cin >> std::ws, message);
-    manage.send_message(client, message);
 
-
-    while(message != "/quit")
+    if (message != "/quit")
     {
+        manage.send_message(server, message);
 
+        //Welcome message
+        std::cout << "Welcome... " << message << "!" << std::endl;
+
+        //Creating the thread to recieve messages
+        std::thread recv_loop(recv_chat, server, std::ref(manage));
+
+        //Start sending messages
+        while(message != "/quit")
+        {
+            std::getline(std::cin >> std::ws, message);
+            manage.send_message(server, message);
+        }
+
+        recv_loop.join();
+    }
+    else 
+    {
+        std::cout << "[!] Nickname can't be a command" << std::endl;
     }
 }
 
@@ -112,7 +148,7 @@ int main()
     //Error Handling
     if (server_fd == 1)
     {
-        std::cout << "[!] Unable to connect to client..." << std::endl;
+        std::cout << "[!] Unable to connect to server..." << std::endl;
 
         return 1;
     }
@@ -121,8 +157,11 @@ int main()
     std::cout << "[*] Connected to the server...!" << std::endl;
 
     //Creating thread
-    std::thread start_chat(start, server_fd, std::ref(manage));
-    start_chat.join();
+    //std::thread start(start_chat, server_fd, std::ref(manage));
+    //start.join();
+    std::thread recv_loop(recv_chat, server_fd, std::ref(manage));
+    recv_loop.join();
 
+    std::cout << "--END CHAT--" << std::endl;
     return 0;
 }
